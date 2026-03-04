@@ -20,6 +20,8 @@ export default function TestSetupPage() {
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [customEmail, setCustomEmail] = useState("");
+  const [customPassword, setCustomPassword] = useState("");
 
   useEffect(() => {
     const client = supabase;
@@ -68,6 +70,67 @@ export default function TestSetupPage() {
         showMessage("success", `${role === "payee" ? "Payee" : "Requester"} created. Check Supabase for email confirmation, or disable it in Auth settings.`);
         setUser(data.user);
       }
+    } catch (err) {
+      showMessage("error", err instanceof Error ? err.message : "Failed");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const createCustomPayee = async () => {
+    if (!supabase || !customEmail.trim() || !customPassword.trim()) {
+      showMessage("error", "Enter email and password.");
+      return;
+    }
+
+    setLoading("custom-payee");
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: customEmail.trim(),
+        password: customPassword.trim(),
+      });
+
+      if (error) {
+        if (error.message.includes("already registered")) {
+          showMessage("success", "Account exists. Sign in with that email and password.");
+        } else {
+          showMessage("error", error.message);
+        }
+        return;
+      }
+
+      if (data.user) {
+        showMessage("success", `Payee ${customEmail} created. You're signed in. Add balance below.`);
+        setUser(data.user);
+      }
+    } catch (err) {
+      showMessage("error", err instanceof Error ? err.message : "Failed");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const signInWithCustom = async () => {
+    if (!supabase || !customEmail.trim() || !customPassword.trim()) {
+      showMessage("error", "Enter email and password.");
+      return;
+    }
+
+    setLoading("signin-custom");
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: customEmail.trim(),
+        password: customPassword.trim(),
+      });
+
+      if (error) {
+        showMessage("error", error.message);
+        return;
+      }
+
+      showMessage("success", `Signed in as ${customEmail}`);
     } catch (err) {
       showMessage("error", err instanceof Error ? err.message : "Failed");
     } finally {
@@ -226,9 +289,40 @@ export default function TestSetupPage() {
       )}
 
       <div className="flex flex-col gap-4">
+        <div className="rounded-xl border p-4" style={{ borderColor: "var(--smartstorey-gold)", backgroundColor: "var(--smartstorey-gold-light)" }}>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--smartstorey-charcoal)" }}>
+            Create real Payee accounts
+          </h2>
+          <p className="mb-3 text-xs" style={{ color: "var(--smartstorey-charcoal-muted)" }}>
+            For vikas.jain@smartstorey.com, vivek.mehta@smartstorey.com, or any email
+          </p>
+          <div className="mb-3 flex flex-col gap-2">
+            <input
+              type="email"
+              placeholder="Email (e.g. vikas.jain@smartstorey.com)"
+              value={customEmail}
+              onChange={(e) => setCustomEmail(e.target.value)}
+              className="rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--smartstorey-gold)]"
+              style={{ borderColor: "var(--smartstorey-sand)", color: "var(--smartstorey-charcoal)" }}
+            />
+            <input
+              type="password"
+              placeholder="Password (share with the Payee)"
+              value={customPassword}
+              onChange={(e) => setCustomPassword(e.target.value)}
+              className="rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--smartstorey-gold)]"
+              style={{ borderColor: "var(--smartstorey-sand)", color: "var(--smartstorey-charcoal)" }}
+            />
+          </div>
+          <div className="flex gap-3">
+            {btn("Create Payee", createCustomPayee, loading === "custom-payee", <UserPlus className="h-4 w-4" />)}
+            {btn("Sign in", signInWithCustom, loading === "signin-custom", <LogIn className="h-4 w-4" />)}
+          </div>
+        </div>
+
         <div className="rounded-xl border p-4" style={{ borderColor: "var(--smartstorey-sand)", backgroundColor: "white" }}>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--smartstorey-charcoal-muted)" }}>
-            Create test users
+            Create test users (dev only)
           </h2>
           <p className="mb-3 text-xs" style={{ color: "var(--smartstorey-charcoal-muted)" }}>
             Password for both: Test123!@#
@@ -241,7 +335,7 @@ export default function TestSetupPage() {
 
         <div className="rounded-xl border p-4" style={{ borderColor: "var(--smartstorey-sand)", backgroundColor: "white" }}>
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--smartstorey-charcoal-muted)" }}>
-            Sign in
+            Sign in (test users)
           </h2>
           <div className="flex gap-3">
             {btn("Sign in as Payee", () => signIn("payee"), loading === "signin-payee", <LogIn className="h-4 w-4" />)}
