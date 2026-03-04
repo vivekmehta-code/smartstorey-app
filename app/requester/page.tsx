@@ -24,6 +24,7 @@ export default function RequesterPage() {
   const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [upiString, setUpiString] = useState<string>("");
+  const [amount, setAmount] = useState<string>("");
   const [category, setCategory] = useState<ExpenseCategory | "">("");
   const [requesterEmail, setRequesterEmail] = useState<string>("");
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
@@ -133,9 +134,22 @@ export default function RequesterPage() {
     });
   }, [supabase]);
 
+  // Pre-fill amount from QR when it contains one
+  useEffect(() => {
+    if (upiString) {
+      const qrAmount = extractAmountFromUpi(upiString);
+      if (qrAmount != null) setAmount(String(qrAmount));
+    }
+  }, [upiString]);
+
   const handleSubmit = async () => {
     if (!upiString.trim()) {
       setError("Please scan or upload a QR code first.");
+      return;
+    }
+    const amountNum = parseFloat(amount.trim());
+    if (!amount.trim() || isNaN(amountNum) || amountNum <= 0) {
+      setError("Please enter a valid amount.");
       return;
     }
     if (!category) {
@@ -152,7 +166,6 @@ export default function RequesterPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const amount = extractAmountFromUpi(upiString);
       const email = user?.email ?? (requesterEmail.trim() || null);
 
       const { error: insertError } = await supabase.from("requests").insert({
@@ -160,7 +173,7 @@ export default function RequesterPage() {
         requester_email: email,
         category,
         upi_string: upiString,
-        amount: amount,
+        amount: amountNum,
         status: "pending",
       });
 
@@ -175,6 +188,7 @@ export default function RequesterPage() {
 
   const resetForm = () => {
     setUpiString("");
+    setAmount("");
     setCategory("");
     setRequesterEmail("");
     setSubmitted(false);
@@ -306,11 +320,25 @@ export default function RequesterPage() {
             <p className="break-all font-mono text-sm" style={{ color: "var(--smartstorey-charcoal)" }}>
               {upiString}
             </p>
-            {extractAmountFromUpi(upiString) && (
-              <p className="mt-2 text-sm" style={{ color: "var(--smartstorey-charcoal-muted)" }}>
-                Amount: ₹{extractAmountFromUpi(upiString)}
-              </p>
-            )}
+          </div>
+        )}
+
+        {/* Amount - required */}
+        {upiString && (
+          <div>
+            <label className="mb-2 block text-sm font-medium" style={{ color: "var(--smartstorey-charcoal)" }}>
+              Amount (₹) <span style={{ color: "var(--smartstorey-gold)" }}>*</span>
+            </label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="e.g. 500"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full rounded-xl border bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--smartstorey-gold)] focus:ring-offset-0"
+              style={{ borderColor: "var(--smartstorey-sand)", color: "var(--smartstorey-charcoal)" }}
+            />
           </div>
         )}
 
